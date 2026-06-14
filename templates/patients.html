@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+
+{% block title %}Danh sách Bệnh nhân - Exo Rehab{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm border-0 bg-white p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="fw-bold text-dark m-0"><i class="fa-solid fa-user-injured text-success me-2"></i>Quản lý danh sách bệnh nhân</h4>
+            <small class="text-muted">Xem thông tin chi tiết và hồ sơ chẩn đoán của từng bệnh nhân</small>
+        </div>
+        <button class="btn btn-success fw-bold" onclick="alert('Tính năng thêm bệnh nhân trực tiếp từ Web sẽ được phát triển ở bước tiếp theo!')">
+            <i class="fa-solid fa-user-plus me-1"></i> Thêm bệnh nhân mới
+        </button>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>Mã BN</th>
+                    <th>Họ và Tên</th>
+                    <th>Năm sinh</th>
+                    <th>Giới tính</th>
+                    <th>Chẩn đoán lâm sàng</th>
+                    <th>Ghi chú thêm</th>
+                    <th>Ngày tạo hồ sơ</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if patients %}
+                    {% for p in patients %}
+                    <tr>
+                        <td class="fw-bold text-primary">{{ p.code }}</td>
+                        <td class="fw-bold text-dark">{{ p.full_name }}</td>
+                        <td>{{ p.birth_year if p.birth_year else '---' }}</td>
+                        <td>
+                            {% if p.gender == 'male' %} <span class="badge bg-blue text-primary-emphasis bg-primary-subtle px-2">Nam</span>
+                            {% elif p.gender == 'female' %} <span class="badge bg-pink text-danger-emphasis bg-danger-subtle px-2">Nữ</span>
+                            {% else %} <span class="badge bg-secondary px-2">Khác</span> {% endif %}
+                        </td>
+                        <td><small class="text-wrap d-block" style="max-width: 300px;">{{ p.diagnosis if p.diagnosis else 'Chưa có chẩn đoán' }}</small></td>
+                        <td><small class="text-muted text-wrap d-block" style="max-width: 200px;">{{ p.notes if p.notes else '---' }}</small></td>
+                        <td><small>{{ p.created_at.strftime('%d/%m/%Y %H:%M') }}</small></td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-muted">
+                            <i class="fa-regular fa-folder-open d-block h3 mb-2"></i>
+                            Chưa có bệnh nhân nào trong cơ sở dữ liệu. Hãy thêm dữ liệu mẫu vào bảng <code>patients</code> trong phpMyAdmin!
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

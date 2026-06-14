@@ -1,0 +1,199 @@
+{% extends 'base.html' %}
+
+{% block title %}Realtime Dashboard - Exo Rehab{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card shadow-sm border-0 bg-white p-3 d-flex flex-row align-items-center justify-content-between">
+            <div>
+                <h4 class="m-0 fw-bold text-dark"><i class="fa-solid fa-gauge-high text-success me-2"></i>Bảng điều khiển đo lường</h4>
+                <small class="text-muted">Chọn bệnh nhân và bấm Bắt đầu để tiến hành thu thập số liệu</small>
+            </div>
+            
+            <div class="d-flex gap-2 align-items-center">
+                <select id="patientSelect" class="form-select style-select" style="width: 250px;">
+                    <option value="">-- Chọn bệnh nhân --</option>
+                    {% for p in patients %}
+                        <option value="{{ p.id }}">{{ p.code }} - {{ p.full_name }}</option>
+                    {% endfor %}
+                </select>
+                <button id="btnStart" class="btn btn-success fw-bold px-3">
+                    <i class="fa-solid fa-play me-1"></i> Bắt đầu phiên
+                </button>
+                <button id="btnStop" class="btn btn-danger fw-bold px-3" disabled>
+                    <i class="fa-solid fa-stop me-1"></i> Dừng và Lưu
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4 text-center">
+    <div class="col-md-4">
+        <div class="card shadow-sm border-start border-primary border-4 p-3 bg-white">
+            <h6 class="text-muted text-uppercase fw-bold small">Lực Cảm biến 1</h6>
+            <h2 id="kpiForce1" class="fw-bold text-primary my-1">0.0 <span class="h4">N</span></h2>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm border-start border-info border-4 p-3 bg-white">
+            <h6 class="text-muted text-uppercase fw-bold small">Lực Cảm biến 2</h6>
+            <h2 id="kpiForce2" class="fw-bold text-info my-1">0.0 <span class="h4">N</span></h2>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm border-start border-warning border-4 p-3 bg-white">
+            <h6 class="text-muted text-uppercase fw-bold small">Góc Khớp Hiện Tại</h6>
+            <h2 id="kpiAngle" class="fw-bold text-warning my-1">0.0 <span class="h4">°</span></h2>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card shadow-sm border-0 p-3 bg-white">
+            <h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-wave-square text-primary me-2"></i>Đồ thị Lực Realtime (N)</h5>
+            <div style="position: relative; height:300px;">
+                <canvas id="forceChart"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 mb-4">
+        <div class="card shadow-sm border-0 p-3 bg-white">
+            <h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-bezier-curve text-warning me-2"></i>Đồ thị Góc Realtime (độ)</h5>
+            <div style="position: relative; height:300px;">
+                <canvas id="angleChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.socketio.org/4.6.0/socketio.min.js"></script>
+
+<script>
+    // 1. Khởi tạo cấu hình Đồ thị Lực (Force Chart)
+    const ctxForce = document.getElementById('forceChart').getContext('2d');
+    const forceChart = new Chart(ctxForce, {
+        type: 'line',
+        data: {
+            labels: [], // Trục X chứa thời gian (s)
+            datasets: [
+                { label: 'Lực 1 (N)', data: [], borderColor: '#0d6efd', tension: 0.2, pointRadius: 0 },
+                { label: 'Lực 2 (N)', data: [], borderColor: '#0dcaf0', tension: 0.2, pointRadius: 0 }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { x: { title: { display: true, text: 'Thời gian (s)' } }, y: { title: { display: true, text: 'Lực (N)' } } }
+        }
+    });
+
+    // 2. Khởi tạo cấu hình Đồ thị Góc (Angle Chart)
+    const ctxAngle = document.getElementById('angleChart').getContext('2d');
+    const angleChart = new Chart(ctxAngle, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{ label: 'Góc (°)', data: [], borderColor: '#ffc107', tension: 0.2, pointRadius: 0 }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { x: { title: { display: true, text: 'Thời gian (s)' } }, y: { title: { display: true, text: 'Góc (độ)' } } }
+        }
+    });
+
+    // 3. Xử lý logic bấm nút Bắt đầu / Dừng phiên tập bằng API
+    let activeSessionId = null;
+
+    document.getElementById('btnStart').addEventListener('click', function() {
+        const patientId = document.getElementById('patientSelect').value;
+        if (!patientId) {
+            alert('Vui lòng chọn một bệnh nhân trước khi bắt đầu phiên đo!');
+            return;
+        }
+
+        fetch('/api/start_session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ patient_id: patientId })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                activeSessionId = data.session_id;
+                document.getElementById('btnStart').disabled = true;
+                document.getElementById('patientSelect').disabled = true;
+                document.getElementById('btnStop').disabled = false;
+                
+                // Xóa đồ thị cũ để sẵn sàng vẽ phiên mới
+                forceChart.data.labels = []; forceChart.data.datasets[0].data = []; forceChart.data.datasets[1].data = [];
+                angleChart.data.labels = []; angleChart.data.datasets[0].data = [];
+                forceChart.update(); angleChart.update();
+                
+                alert('Phiên đo mới đã kích hoạt thành công! Đang đợi dữ liệu từ phần cứng...');
+            }
+        });
+    });
+
+    document.getElementById('btnStop').addEventListener('click', function() {
+        fetch('/api/stop_session', { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                activeSessionId = null;
+                document.getElementById('btnStart').disabled = false;
+                document.getElementById('patientSelect').disabled = false;
+                document.getElementById('btnStop').disabled = true;
+                alert('Đã đóng và lưu phiên tập thành công vào cơ sở dữ liệu!');
+            }
+        });
+    });
+
+    // 4. Kết nối mạng WebSocket Realtime tới Server Flask
+    const socket = io();
+
+    // Lắng nghe dữ liệu đẩy về liên tục từ Server
+    socket.on('new_data', function(payload) {
+        // Chỉ vẽ đồ thị nếu ứng dụng đang trong một phiên đo active
+        if (!activeSessionId) return;
+
+        const timeLabel = payload.time.toFixed(1);
+
+        if (payload.type === 'loadcell') {
+            // Cập nhật số liệu hiển thị nhanh
+            document.getElementById('kpiForce1').innerHTML = payload.f1.toFixed(1) + " <span class='h4'>N</span>";
+            document.getElementById('kpiForce2').innerHTML = payload.f2.toFixed(1) + " <span class='h4'>N</span>";
+            
+            // Đẩy điểm mới vào đồ thị lực
+            forceChart.data.labels.push(timeLabel);
+            forceChart.data.datasets[0].data.push(payload.f1);
+            forceChart.data.datasets[1].data.push(payload.f2);
+            
+            // Giới hạn hiển thị 30 điểm gần nhất cho đỡ lag màn hình
+            if (forceChart.data.labels.length > 30) {
+                forceChart.data.labels.shift(); forceChart.data.datasets[0].data.shift(); forceChart.data.datasets[1].data.shift();
+            }
+            forceChart.update('none'); // Update dạng 'none' để tăng tốc độ vẽ mượt hơn
+        } 
+        
+        else if (payload.type === 'encoder') {
+            // Cập nhật số hiển thị nhanh góc
+            document.getElementById('kpiAngle').innerHTML = payload.angle.toFixed(1) + " <span class='h4'>°</span>";
+            
+            // Đẩy điểm mới vào đồ thị góc
+            angleChart.data.labels.push(timeLabel);
+            angleChart.data.datasets[0].data.push(payload.angle);
+            
+            if (angleChart.data.labels.length > 30) {
+                angleChart.data.labels.shift(); angleChart.data.datasets[0].data.shift();
+            }
+            angleChart.update('none');
+        }
+    });
+</script>
+{% endblock %}

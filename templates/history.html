@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+
+{% block title %}Lịch sử phiên đo - Exo Rehab{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm border-0 bg-white p-4">
+    <div class="mb-4">
+        <h4 class="fw-bold text-dark m-0"><i class="fa-solid fa-history text-success me-2"></i>Lịch sử các phiên đo lường</h4>
+        <small class="text-muted">Danh sách tổng hợp kết quả luyện tập và đo lực/góc của bệnh nhân theo thời gian</small>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>ID Phiên</th>
+                    <th>Mã BN</th>
+                    <th>Tên bệnh nhân</th>
+                    <th>Thời gian bắt đầu</th>
+                    <th>Thời gian kết thúc</th>
+                    <th>Trạng thái</th>
+                    <th>Ghi chú tóm tắt</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if sessions %}
+                    {% for s in sessions %}
+                    <tr>
+                        <td class="fw-bold">#{{ s.id }}</td>
+                        <td class="text-primary fw-bold">{{ s.patient_code }}</td>
+                        <td class="fw-bold text-dark">{{ s.patient_name }}</td>
+                        <td><small>{{ s.started_at.strftime('%d/%m/%Y %H:%M:%S') }}</small></td>
+                        <td>
+                            <small>{{ s.ended_at.strftime('%d/%m/%Y %H:%M:%S') if s.ended_at else '---' }}</small>
+                        </td>
+                        <td>
+                            {% if s.status == 'active' %}
+                                <span class="badge bg-success border border-success-subtle px-2"><i class="fa-solid fa-spinner fa-spin me-1"></i> Đang đo...</span>
+                            {% elif s.status == 'completed' %}
+                                <span class="badge bg-primary px-2"><i class="fa-solid fa-check me-1"></i> Hoàn thành</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark px-2"><i class="fa-solid fa-circle-exclamation me-1"></i> Bị gián đoạn</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <small class="text-muted">{{ s.summary_note if s.summary_note else 'Không có ghi chú' }}</small>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-muted">
+                            <i class="fa-solid fa-box-open d-block h3 mb-2"></i>
+                            Chưa có phiên đo nào được ghi nhận. Hãy bấm "Bắt đầu" ở màn hình Dashboard để tạo phiên đầu tiên!
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
