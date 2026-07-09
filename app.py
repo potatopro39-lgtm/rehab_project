@@ -168,6 +168,11 @@ def stop_session():
 def handle_connect():
     print(f"[*] Trình duyệt đã kết nối WebSocket thành công.")
 
+@socketio.on('new_data')
+def handle_new_data(payload):
+    # Receive data from esp32_to_mysql.py and broadcast to all browsers
+    emit('new_data', payload, broadcast=True)
+
 if __name__ == '__main__':
     print("=== ĐANG KHỞI ĐỘNG WEB SERVER FLASK ===")
     socketio.run(app, host='0.0.0.0', port=5000, debug=True)
